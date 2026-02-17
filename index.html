@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIMZ | Sensitivity Calibrator</title>
+    
+    <!-- Шрифты будущего: Rajdhani (Технический) и Inter (Читаемый) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <!-- Иконки -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-core: #0b0c15;
+            --bg-panel: #13141f;
+            --bg-panel-hover: #1a1c29;
+            --primary: #6366f1; /* Indigo Future */
+            --accent: #00f0ff; /* Cyber Cyan */
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-main: #e2e8f0;
+            --text-dim: #94a3b8;
+            --border: rgba(255, 255, 255, 0.08);
+            --glow: 0 0 20px rgba(99, 102, 241, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        /* --- ФОНОВЫЕ ЭФФЕКТЫ --- */
+        .ambient-bg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
+            background: 
+                radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(0, 240, 255, 0.05) 0%, transparent 50%);
+        }
+        
+        .grid-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+        }
+
+        /* --- LAYOUT --- */
+        .dashboard {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 2rem;
+            max-width: 1400px;
+            width: 95%;
+            padding: 2rem 0;
+            animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @media (max-width: 1100px) { .dashboard { grid-template-columns: 1fr; } }
+
+        /* --- ПАНЕЛИ --- */
+        .panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .panel-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem;
+        }
+
+        h1, h2, h3 { font-family: 'Rajdhani', sans-serif; text-transform: uppercase; letter-spacing: 1px; }
+        h2 { font-size: 1.4rem; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+        h2 i { color: var(--primary); }
+
+        /* --- ЭЛЕМЕНТЫ ВВОДА --- */
+        .control-group { margin-bottom: 1.5rem; position: relative; }
+        
+        .label-row { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
+        label { font-size: 0.85rem; color: var(--text-dim); font-weight: 500; }
+        
+        /* Кнопка Info (i) */
+        .info-btn {
+            color: var(--accent); cursor: pointer; font-size: 0.9rem; transition: 0.2s;
+            position: relative;
+        }
+        .info-btn:hover { text-shadow: 0 0 8px var(--accent); }
+
+        /* TOOLTIP */
+        .tooltip {
+            visibility: hidden; opacity: 0;
+            position: absolute; bottom: 100%; right: 0;
+            width: 280px;
+            background: rgba(10, 10, 15, 0.95);
+            border: 1px solid var(--accent);
+            padding: 1rem; border-radius: 8px;
+            font-size: 0.8rem; color: #fff; line-height: 1.4;
+            z-index: 100; box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+            transition: 0.2s; pointer-events: none;
+            backdrop-filter: blur(5px);
+        }
+        .info-btn:hover .tooltip { visibility: visible; opacity: 1; transform: translateY(-10px); }
+
+        select, input[type="number"], input[type="text"] {
+            width: 100%;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            color: #fff; padding: 14px; border-radius: 8px;
+            font-family: 'Rajdhani', sans-serif; font-size: 1.1rem;
+            transition: 0.3s;
+        }
+        select:focus, input:focus { border-color: var(--primary); box-shadow: var(--glow); outline: none; }
+
+        /* Секция Custom Yaw (скрытая по умолчанию) */
+        #customYawGroup { display: none; margin-top: 10px; animation: fadeIn 0.3s; }
+        
+        /* --- ВИЗУАЛИЗАЦИЯ (ПРАВАЯ ЧАСТЬ) --- */
+        .viz-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem; }
+        
+        .main-stat { text-align: right; }
+        .main-stat-val { font-size: 4rem; font-family: 'Rajdhani', sans-serif; font-weight: 700; line-height: 1; color: var(--accent); }
+        .main-stat-label { font-size: 0.9rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; }
+
+        /* Линейка коврика */
+        .pad-simulation {
+            position: relative; height: 160px; background: #0f1016;
+            border: 1px dashed var(--border); border-radius: 12px;
+            margin: 2rem 0; overflow: hidden;
+            display: flex; align-items: center;
+        }
+
+        .ruler-marks {
+            position: absolute; bottom: 0; width: 100%; height: 100%; pointer-events: none;
+            background-image: linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 10% 100%; opacity: 0.3;
+        }
+        
+        /* Полоса движения */
+        .motion-bar {
+            height: 20px;
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0) 0%, var(--primary) 50%, var(--accent) 100%);
+            position: relative; left: 20px;
+            border-radius: 4px;
+            transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+        }
+        
+        .motion-value {
+            position: absolute; right: -40px; top: -25px;
+            color: var(--accent); font-family: 'Rajdhani'; font-weight: bold;
+        }
+
+        /* --- КАРТОЧКИ АНАЛИТИКИ --- */
+        .metrics-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;
+        }
+
+        .metric-card {
+            background: rgba(255,255,255,0.02);
+            padding: 1.5rem; border-radius: 12px; border: 1px solid transparent;
+            transition: 0.3s;
+        }
+        .metric-card:hover { border-color: rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); }
+
+        .m-title { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.5rem; text-transform: uppercase; }
+        .m-val { font-size: 1.5rem; font-family: 'Rajdhani'; font-weight: 600; color: #fff; }
+        .m-desc { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.5rem; line-height: 1.4; }
+
+        /* Стиль ползунка Windows */
+        .win-slider-container {
+            margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px;
+        }
+        input[type=range] {
+            width: 100%; height: 4px; background: #333; border-radius: 2px; -webkit-appearance: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 16px; height: 16px; background: var(--primary); border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px var(--primary);
+        }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    </style>
+</head>
+<body>
+
+    <div class="ambient-bg"></div>
+    <div class="grid-overlay"></div>
+
+    <div class="dashboard">
+        
+        <!-- ЛЕВАЯ ПАНЕЛЬ: ВВОД ДАННЫХ -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2><i class="ri-settings-5-line"></i> Input Data</h2>
+                <div style="font-size: 0.8rem; color: var(--accent); border: 1px solid var(--accent); padding: 2px 8px; border-radius: 4px;">v1.0</div>
+            </div>
+
+            <!-- Выбор игры -->
+            <div class="control-group">
+                <div class="label-row">
+                    <label>GAME ENGINE / PRESET</label>
+                    <div class="info-btn"><i class="ri-information-line"></i>
+                        <div class="tooltip">
+                            Каждая игра по-разному обрабатывает движения мыши. Параметр "Yaw" определяет, на сколько градусов повернется камера за 1 "дот" (пиксель) мыши. Мы автоматически подставляем верный Yaw.
+                        </div>
+                    </div>
+                </div>
+                <select id="gameSelect" onchange="toggleCustomYaw()">
+                    <optgroup label="Source Engine / Valve (Yaw 0.022)">
+                        <option value="0.022" selected>Counter-Strike 2</option>
+                        <option value="0.022">Deadlock</option>
+                        <option value="0.022">Apex Legends</option>
+                        <option value="0.022">Titanfall 2</option>
+                        <option value="0.022">Left 4 Dead 2</option>
+                    </optgroup>
+                    <optgroup label="Blizzard / CoD Scale (Yaw 0.0066)">
+                        <option value="0.0066">Overwatch 2</option>
+                        <option value="0.0066">Call of Duty (MW/WZ/BO6)</option>
+                        <option value="0.0066">Destiny 2</option>
+                    </optgroup>
+                    <optgroup label="Tactical & Survival">
+                        <option value="0.07">Valorant (UE4)</option>
+                        <option value="0.022">Arena Breakout: Infinite</option>
+                        <option value="0.022">Delta Force: Hawk Ops</option>
+                        <option value="0.022">Stalcraft X</option>
+                        <option value="0.1125">Rust (Default)</option>
+                        <option value="0.007">PUBG (General)</option>
+                        <option value="0.022">Arc Raiders</option>
+                    </optgroup>
+                    <option value="custom">Custom Yaw (Expert)</option>
+                </select>
+                
+                <!-- Скрытое поле для кастомного Yaw -->
+                <div id="customYawGroup">
+                    <input type="number" id="customYawVal" placeholder="Введите Yaw (например 0.022)" step="0.0001">
+                </div>
+            </div>
+
+            <!-- Блок DPI -->
+            <div class="control-group">
+                <div class="label-row">
+                    <label>CURRENT DPI</label>
+                    <div class="info-btn"><i class="ri-information-line"></i>
+                        <div class="tooltip">
+                            DPI (Dots Per Inch) — аппаратное разрешение сенсора мыши. Чем выше DPI, тем больше "считываний" на дюйм движения.
+                        </div>
+                    </div>
+                </div>
+                <input type="number" id="curDpi" value="800">
+            </div>
+
+            <!-- Блок Sens -->
+            <div class="control-group">
+                <div class="label-row">
+                    <label>IN-GAME SENSITIVITY</label>
+                </div>
+                <input type="number" id="curSens" value="1.2" step="0.01">
+            </div>
+
+            <!-- Windows Sens -->
+            <div class="control-group">
+                <div class="label-row">
+                    <label style="display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" id="winSensCheck" onclick="toggleWinSlider()"> INCLUDE WINDOWS SENS
+                    </label>
+                    <div class="info-btn"><i class="ri-information-line"></i>
+                        <div class="tooltip">
+                            Включайте ТОЛЬКО если в игре выключен "Raw Input" (Сырой ввод). Если Raw Input включен (как в CS2 по умолчанию), настройки Windows игнорируются.
+                        </div>
+                    </div>
+                </div>
+                <div id="winSliderBlock" class="win-slider-container" style="display:none;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-dim); margin-bottom:5px;">
+                        <span>1/11</span><span id="winValText" style="color:var(--primary)">6/11 (Standard)</span><span>11/11</span>
+                    </div>
+                    <input type="range" id="winSlider" min="1" max="11" value="6" oninput="updateWinText()">
+                </div>
+            </div>
+
+            <hr style="border:0; border-top:1px solid var(--border); margin: 2rem 0;">
+
+            <!-- Целевой DPI -->
+            <div class="control-group">
+                <div class="label-row">
+                    <label style="color: var(--accent);">TARGET DPI (GOAL)</label>
+                    <div class="info-btn"><i class="ri-information-line"></i>
+                        <div class="tooltip">
+                            DPI, который вы хотите установить. Мы пересчитаем сенсу так, чтобы скорость осталась идентичной.
+                        </div>
+                    </div>
+                </div>
+                <input type="number" id="tarDpi" value="1600" style="border-color: var(--accent); background: rgba(0, 240, 255, 0.05);">
+            </div>
+
+        </div>
+
+        <!-- ПРАВАЯ ПАНЕЛЬ: АНАЛИТИКА -->
+        <div class="panel">
+            <div class="viz-header">
+                <div>
+                    <h3><i class="ri-focus-3-line"></i> Physics & Calibration</h3>
+                    <p style="color: var(--text-dim); font-size: 0.9rem; margin-top: 5px;">Real-time calculation engine</p>
+                </div>
+                <div class="main-stat">
+                    <div class="main-stat-val" id="resSens">0.60</div>
+                    <div class="main-stat-label">New Sensitivity</div>
+                </div>
+            </div>
+
+            <!-- Визуализация ковра -->
+            <div style="position: relative;">
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-dim); margin-bottom:5px;">
+                    <span>Mouse Pad Visualization</span>
+                    <span>Standard XL Pad (45-50cm)</span>
+                </div>
+                <div class="pad-simulation">
+                    <div class="ruler-marks"></div>
+                    <!-- Полоса -->
+                    <div class="motion-bar" id="motionBar">
+                        <div class="motion-value" id="motionVal">360°</div>
+                    </div>
+                    
+                    <!-- Маркеры -->
+                    <div style="position: absolute; left: 50%; height: 100%; width: 1px; background: rgba(255,255,255,0.1);"></div>
+                    <div style="position: absolute; top:10px; right:10px; font-size:0.7rem; color:var(--danger); display:none;" id="warnText">
+                        <i class="ri-alert-line"></i> PAD TOO SMALL
+                    </div>
+                </div>
+            </div>
+
+            <!-- Сетка метрик -->
+            <div class="metrics-grid">
+                
+                <!-- Карточка 1: CM/360 -->
+                <div class="metric-card">
+                    <div class="m-title">Distance / 360°</div>
+                    <div class="m-val" id="resCm">43.3 <span style="font-size:1rem; color:var(--text-dim)">cm</span></div>
+                    <div class="m-desc">Физическое расстояние, которое должна пройти мышь для полного оборота.</div>
+                </div>
+
+                <!-- Карточка 2: Стиль -->
+                <div class="metric-card">
+                    <div class="m-title">Aiming Style</div>
+                    <div class="m-val" id="resStyle" style="font-size: 1.2rem;">Hybrid</div>
+                    <div class="m-desc" id="resStyleDesc">Баланс между скоростью и точностью.</div>
+                </div>
+
+                <!-- Карточка 3: Биомеханика -->
+                <div class="metric-card">
+                    <div class="m-title">Biomechanics</div>
+                    <div class="m-val" id="resBio" style="font-size: 1.2rem;">Wrist + Arm</div>
+                    <div class="m-desc">Основная наводка рукой, микро-доводка кистью.</div>
+                </div>
+                
+                <!-- Карточка 4: eDPI -->
+                <div class="metric-card">
+                    <div class="m-title">eDPI</div>
+                    <div class="m-val" id="resEdpi">960</div>
+                    <div class="m-desc">Эффективный индекс DPI. Удобно для сравнения с про-игроками.</div>
+                </div>
+
+                <!-- Карточка 5: Pixel Skip -->
+                <div class="metric-card">
+                    <div class="m-title">Pixel Ratio</div>
+                    <div class="m-val" id="resRatio" style="color: var(--success);">Good</div>
+                    <div class="m-desc">Качество считывания. High DPI снижает задержку и рывки.</div>
+                </div>
+
+                <!-- Карточка 6: Speed -->
+                <div class="metric-card">
+                    <div class="m-title">Speed Class</div>
+                    <div class="m-val" id="resClass">Medium</div>
+                    <div class="m-desc">Классификация скорости относительно среднего игрока.</div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Коэффициенты Windows
+        const winFactors = [0, 0.0625, 0.0625, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
+
+        // Слушатели событий
+        const inputs = document.querySelectorAll('input, select');
+        inputs.forEach(el => el.addEventListener('input', calculate));
+
+        function toggleCustomYaw() {
+            const select = document.getElementById('gameSelect');
+            const customGroup = document.getElementById('customYawGroup');
+            if (select.value === 'custom') {
+                customGroup.style.display = 'block';
+            } else {
+                customGroup.style.display = 'none';
+            }
+            calculate();
+        }
+
+        function toggleWinSlider() {
+            const check = document.getElementById('winSensCheck');
+            document.getElementById('winSliderBlock').style.display = check.checked ? 'block' : 'none';
+            calculate();
+        }
+
+        function updateWinText() {
+            const val = document.getElementById('winSlider').value;
+            document.getElementById('winValText').innerText = `${val}/11 (${winFactors[val]}x)`;
+            calculate();
+        }
+
+        function calculate() {
+            // 1. Получение Yaw
+            let yaw = 0.022; // Default Source
+            const selectVal = document.getElementById('gameSelect').value;
+            
+            if (selectVal === 'custom') {
+                const customVal = parseFloat(document.getElementById('customYawVal').value);
+                yaw = customVal > 0 ? customVal : 0.022;
+            } else {
+                yaw = parseFloat(selectVal);
+            }
+
+            // 2. Получение цифр
+            const curDpi = parseFloat(document.getElementById('curDpi').value) || 800;
+            const curSens = parseFloat(document.getElementById('curSens').value) || 1;
+            const tarDpi = parseFloat(document.getElementById('tarDpi').value) || 1600;
+            
+            // 3. Учет Windows
+            let winMult = 1.0;
+            if (document.getElementById('winSensCheck').checked) {
+                const sliderIdx = parseInt(document.getElementById('winSlider').value);
+                winMult = winFactors[sliderIdx];
+            }
+
+            const effectiveSens = curSens * winMult;
+
+            // 4. МАТЕМАТИКА
+            // cm/360 = (360 / (DPI * Sens * Yaw)) * 2.54
+            const cm360 = (360 / (curDpi * effectiveSens * yaw)) * 2.54;
+            
+            // New Sens = (CurDpi * EffectiveSens) / TarDpi
+            // Если WinSens включен, мы предполагаем, что на новом DPI он будет такой же.
+            const newSens = (curDpi * effectiveSens) / tarDpi;
+            
+            // eDPI (Просто DPI * Sens, без Yaw, так принято в комьюнити, но зависит от игры)
+            // Для универсальности покажем просто произведение
+            const edpi = curDpi * effectiveSens;
+
+            // 5. ВЫВОД РЕЗУЛЬТАТОВ
+            document.getElementById('resSens').innerText = newSens.toFixed(3);
+            document.getElementById('resCm').innerHTML = cm360.toFixed(1) + ' <span style="font-size:1rem; color:var(--text-dim)">cm</span>';
+            document.getElementById('resEdpi').innerText = edpi.toFixed(0);
+
+            // 6. ВИЗУАЛИЗАЦИЯ (Ковер 50см)
+            const padSize = 50;
+            const percent = (cm360 / padSize) * 100;
+            
+            const bar = document.getElementById('motionBar');
+            const warn = document.getElementById('warnText');
+            
+            if (percent > 100) {
+                bar.style.width = '100%';
+                bar.style.background = 'linear-gradient(90deg, #ef4444, #b91c1c)'; // Red
+                warn.style.display = 'block';
+                document.getElementById('motionVal').innerText = '> 50cm';
+            } else {
+                bar.style.width = percent + '%';
+                bar.style.background = 'linear-gradient(90deg, rgba(99, 102, 241, 0) 0%, var(--primary) 50%, var(--accent) 100%)';
+                warn.style.display = 'none';
+                document.getElementById('motionVal').innerText = cm360.toFixed(0) + 'cm';
+            }
+
+            // 7. ЛОГИКА РЕКОМЕНДАЦИЙ (БЕЗ НАЗВАНИЙ ИГР)
+            const styleText = document.getElementById('resStyle');
+            const styleDesc = document.getElementById('resStyleDesc');
+            const bioText = document.getElementById('resBio');
+            const classText = document.getElementById('resClass');
+            
+            if (cm360 < 20) {
+                // < 20cm
+                styleText.innerText = "Reactive Tracking";
+                styleDesc.innerText = "Максимальная скорость реакции. Минимальные движения.";
+                bioText.innerText = "Only Wrist (Только кисть)";
+                classText.innerText = "Ultra High";
+                classText.style.color = "#ef4444";
+            } else if (cm360 >= 20 && cm360 < 35) {
+                // 20-35cm
+                styleText.innerText = "Fast Hybrid";
+                styleDesc.innerText = "Подходит для постоянного отслеживания быстрой цели на 360°.";
+                bioText.innerText = "Wrist Dominant";
+                classText.innerText = "High";
+                classText.style.color = "#f59e0b";
+            } else if (cm360 >= 35 && cm360 < 55) {
+                // 35-55cm
+                styleText.innerText = "Precision Balanced";
+                styleDesc.innerText = "Идеальный баланс. Золотой стандарт киберспорта.";
+                bioText.innerText = "Arm + Wrist (Гибрид)";
+                classText.innerText = "Medium";
+                classText.style.color = "#10b981";
+            } else if (cm360 >= 55 && cm360 < 80) {
+                // 55-80cm
+                styleText.innerText = "Tactical Anchor";
+                styleDesc.innerText = "Высочайшая точность на дальней дистанции. Требует большого ковра.";
+                bioText.innerText = "Arm Dominant";
+                classText.innerText = "Low";
+                classText.style.color = "#00f0ff";
+            } else {
+                // > 80cm
+                styleText.innerText = "Surgical / Inert";
+                styleDesc.innerText = "Экстремально низкая сенса. Сложно делать развороты.";
+                bioText.innerText = "Whole Arm (Вся рука)";
+                classText.innerText = "Ultra Low";
+                classText.style.color = "#6366f1";
+            }
+
+            // Pixel Ratio Logic
+            // Чем выше DPI относительно сенсы, тем плавнее.
+            // Если DPI низкий (400), а сенса высокая - могут быть пропуски.
+            const ratioText = document.getElementById('resRatio');
+            if (curDpi >= 1600) {
+                ratioText.innerText = "Ultra Smooth";
+                ratioText.style.color = "#00f0ff";
+            } else if (curDpi >= 800) {
+                ratioText.innerText = "Standard";
+                ratioText.style.color = "#10b981";
+            } else {
+                ratioText.innerText = "Potential Skipping";
+                ratioText.style.color = "#f59e0b";
+            }
+        }
+
+        // Init
+        calculate();
+
+    </script>
+</body>
+</html>
